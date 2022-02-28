@@ -1,6 +1,9 @@
 import os
 
 import numpy as np
+from torch.utils.data import Dataset
+
+from ..common import Vocabulary
 
 # ##########
 # For Specific Datasets
@@ -11,6 +14,18 @@ TAGS_CONLL03 = [
     "chunk",
     "NER",
 ]
+
+NER_TAGS_CONLL03 = {
+    'O': 0, 
+    'B-PER': 1, 
+    'I-PER': 2, 
+    'B-ORG': 3, 
+    'I-ORG': 4, 
+    'B-LOC': 5, 
+    'I-LOC': 6, 
+    'B-MISC': 7, 
+    'I-MISC': 8,
+}
 
 
 # ##########
@@ -40,7 +55,7 @@ def load_data(
                 
                 word_sample.append(line[0].lower() if lower_case else line[0])
                 for i, tag in enumerate(tags_to_add):
-                    tag_sample[tag].append(line[i])
+                    tag_sample[tag].append(line[i + 1])
 
             # Sample at the end, append
             elif len(word_sample) > 0:
@@ -64,3 +79,41 @@ def load_data(
     return words, tags
 
 
+class CONLL03(Dataset):
+    def __init__(
+        self,
+        filename: str,
+        task: str = "NER",
+        vocab: object = None,
+        ):
+        self.task = task
+
+        self.TAG_LABELS = NER_TAGS_CONLL03
+
+        self.words, self.tags = load_data(filename, tags_to_add=TAGS_CONLL03)
+
+        if vocab is None:
+            self.vocab = Vocabulary()
+            self.vocab.construct(self.words)
+        else:
+            self.vocab = vocab
+
+    def __getitem__(self, i):
+        # word2idx
+        word = self.words[i]
+        x = self.vocab.text_to_id(word)
+
+        # tag2idx
+        tags = self.tags[i][self.task]
+        label = []
+        for tag in tags:
+            label.append(self.TAG_LABELS[tag])
+
+        print(word, len(word))
+        print(tags, len(tags))
+        #assert len(x) == len(label)
+        assert -1 not in tags
+        return x, label
+
+    def __len__(self):
+        return len(self.words)
