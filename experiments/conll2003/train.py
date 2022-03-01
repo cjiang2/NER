@@ -17,10 +17,11 @@ if __name__ == "__main__":
     test_dataset_a = conll.CONLL03(testa_file, vocab=train_dataset.vocab)
     test_dataset_b = conll.CONLL03(testb_file, vocab=train_dataset.vocab)
 
-    for i, batch in enumerate(test_dataset_b):
+    train_loader = conll.get_loader(train_dataset, batch_size=4)
+    for i, batch in enumerate(train_loader):
         print(batch[0])
         print(batch[1])
         print()
 
-        #if i == 4:
-        #    break
+        if i == 0:
+            break

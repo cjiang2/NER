@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 from ..common import Vocabulary
@@ -113,7 +114,44 @@ class CONLL03(Dataset):
         print(tags, len(tags))
         #assert len(x) == len(label)
         assert -1 not in tags
-        return x, label
+        return torch.Tensor(x), torch.Tensor(label)
 
     def __len__(self):
         return len(self.words)
+
+
+def collate_fn(data):
+    """Build mini-batch tensors from a list of (texts, labels) tuples.
+    """
+    # Sort a data list by caption length
+    data.sort(key=lambda x: len(x[0]), reverse=True)
+    X, labels = zip(*data)
+
+    # lengths
+    lengths = [len(label) for label in labels]
+
+    # Merge (convert tuple of 1D tensor to 2D tensor)
+    inputs = torch.zeros(len(X), max(lengths)).long()
+    targets = torch.zeros(len(labels), max(lengths)).long()
+
+    for i in range(len(X)):
+        end = lengths[i]
+        inputs[i, :end] = X[i][:end]
+        targets[i, :end] = labels[i][:end]
+
+    return inputs, targets, lengths
+
+def get_loader(
+    dataset, 
+    batch_size: int = 64,
+    shuffle: bool = True,
+    num_workers: int = 0,
+    collate_fn=collate_fn,
+    ):
+    # Data loader
+    data_loader = torch.utils.data.DataLoader(dataset=dataset,
+                                              batch_size=batch_size,
+                                              shuffle=shuffle,
+                                              num_workers=num_workers,
+                                              collate_fn=collate_fn)
+    return data_loader
