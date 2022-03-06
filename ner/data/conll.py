@@ -33,91 +33,142 @@ NER_TAGS_CONLL03 = {
 
 def load_data(
     filename: str, 
-    tags_to_add: list = TAGS_CONLL03, 
     lower_case: bool = True):
     """Read dataset in CoNLL 2003 format. Collect all tagging annotations, including NER.
     Reference:
         https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Sequence-Labeling/blob/master/utils.py#L12
     Returns:
-        words: raw text data.
+        sentences: raw text data.
         tags: annotated tags.
     """
-    words, tags = [], []
-    word_sample = []
-    tag_sample = {}
-    for tag in tags_to_add:
-        tag_sample[tag] = []
+    sentences, tags = [], []
 
+    # Temp
+    guid = 0
+    tokens = []
+    ner_tags = []
     with open(filename, encoding='utf-8') as f:
         for line in f:
-            # Ignore "DOCSTART"
-            if not (line.isspace() or (len(line) > 10 and line[0:10] == '-DOCSTART-')):
-                line = line.rstrip('\n').split()
-                
-                word_sample.append(line[0].lower() if lower_case else line[0])
-                for i, tag in enumerate(tags_to_add):
-                    tag_sample[tag].append(line[i + 1])
+            # End of last sample
+            if line.startswith("-DOCSTART-") or line == "" or line == "\n":
+                if tokens:
+                    sentences.append(tokens)
+                    tags.append(ner_tags)
+                    guid += 1
+                    tokens = []
+                    ner_tags = []
 
             # Sample at the end, append
-            elif len(word_sample) > 0:
-                for tag in tags_to_add: assert len(word_sample) == len(tag_sample[tag])
-                words.append(word_sample)
-                tags.append(tag_sample)
-                word_sample = []
-                tag_sample = {}
-                for tag in tags_to_add:
-                    tag_sample[tag] = []
+            else:
+                splits = line.split(" ")
+                tokens.append(splits[0])
+                ner_tags.append(splits[3].rstrip())
 
-        # last sentence
-        if len(word_sample) > 0:
-            for tag in tags_to_add: assert len(word_sample) == len(tag_sample[tag])
-            words.append(word_sample)
-            tags.append(tag_sample)
+        # last sample
+        sentences.append(tokens)
+        tags.append(ner_tags)
+        guid += 1
 
     # Sanity check
-    assert len(words) == len(tags)
+    assert len(sentences) == len(tags)
 
-    return words, tags
+    return sentences, tags
 
 
 class CONLL03(Dataset):
     def __init__(
         self,
         filename: str,
-        task: str = "NER",
         vocab: object = None,
         ):
-        self.task = task
-
-        self.TAG_LABELS = NER_TAGS_CONLL03
-
-        self.words, self.tags = load_data(filename, tags_to_add=TAGS_CONLL03)
+        self.sentences, self.labels = load_data(filename)
 
         if vocab is None:
             self.vocab = Vocabulary()
-            self.vocab.construct(self.words)
+            self.vocab.construct(self.sentences)
         else:
             self.vocab = vocab
 
     def __getitem__(self, i):
         # word2idx
-        word = self.words[i]
-        x = self.vocab.text_to_id(word)
+        sentence = self.sentences[i]
+        x = self.vocab.text_to_id(sentence)
 
         # tag2idx
-        tags = self.tags[i][self.task]
+        tags = self.tags[i]
         label = []
         for tag in tags:
-            label.append(self.TAG_LABELS[tag])
+            label.append(NER_TAGS_CONLL03[tag])
 
-        print(word, len(word))
-        print(tags, len(tags))
-        #assert len(x) == len(label)
-        assert -1 not in tags
         return torch.Tensor(x), torch.Tensor(label)
 
     def __len__(self):
-        return len(self.words)
+        return len(self.sentences)
+
+
+class SplitCONLL03(Dataset):
+    def __init__(
+        self,
+        filename: str,
+        tags_to_remove: list,
+        vocab: object = None,
+        ):
+        sentences, labels = load_data(filename)
+
+        if vocab is None:
+            self.vocab = Vocabulary()
+            self.vocab.construct(sentences)
+        else:
+            self.vocab = vocab
+
+        # Do some class summary here
+        labels_unique = {}
+        for label in labels:
+            tags = ', '.join(sorted(set(label)))
+
+            if tags not in labels_unique:
+                labels_unique[tags] = 1
+            else:
+                labels_unique[tags] += 1
+        
+        self.class_counts_individual(labels)
+
+        self.sentences, self.labels = [], []
+        for i, sentence in enumerate(sentences):
+            label = labels[i]
+            collect = True
+            for tag in tags_to_remove:
+                if tag in label:
+                    collect = False
+            if collect:
+                self.sentences.append(sentence)
+                self.labels.append(label)
+
+        self.class_counts_individual(self.labels)
+
+    def class_counts_individual(self, labels):
+        class_counts = {t: 0 for t in NER_TAGS_CONLL03}
+        for label in labels:
+            tags = sorted(set(label))
+            for tag in tags:
+                class_counts[tag] += 1
+        print(class_counts)
+
+    def __getitem__(self, i):
+        # word2idx
+        sentence = self.sentences[i]
+        x = self.vocab.text_to_id(sentence)
+
+        # tag2idx
+        tags = self.labels[i]
+        label = []
+        for tag in tags:
+            label.append(NER_TAGS_CONLL03[tag])
+
+        return torch.Tensor(x), torch.Tensor(label)
+
+    def __len__(self):
+        return len(self.sentences)
 
 
 def collate_fn(data):
@@ -132,7 +183,7 @@ def collate_fn(data):
 
     # Merge (convert tuple of 1D tensor to 2D tensor)
     inputs = torch.zeros(len(X), max(lengths)).long()
-    targets = torch.zeros(len(labels), max(lengths)).long()
+    targets = -1 * torch.ones(len(labels), max(lengths)).long()
 
     for i in range(len(X)):
         end = lengths[i]

@@ -35,13 +35,9 @@ class Vocabulary(object):
     """
     def __init__(self,
                  pad_word: str = "<pad>",   # Also used as end token
-                 #start_word: str = None,
-                 unk_word: str = "<unk>",
                 ):
         self.pad_word = pad_word
-        #self.start_word = start_word
         assert pad_word is not None
-        self.unk_word = unk_word
 
         self.vocab = dict()
         self.reverse_vocab = []
@@ -51,8 +47,10 @@ class Vocabulary(object):
 
     def _save_special_word_ids(self):
         self.pad_id = 0
-        #self.start_id = 1
-        self.unk_id = -1
+        # Pad special tokens
+        self.reverse_vocab.append(self.pad_word)
+        self.vocab[self.pad_id] = self.pad_word
+
 
     def construct(
         self, 
@@ -62,11 +60,6 @@ class Vocabulary(object):
         """Construct vocabulary from a list of texts.
         """
         print("Creating vocabulary...")
-        # Pad special tokens
-        self.reverse_vocab.append(self.pad_word)
-        #self.reverse_vocab.append(self.start_word)
-        if self.unk_word is not None:
-            self.reverse_vocab.append(self.unk_word)
 
         counter = Counter()
         for text in texts:
@@ -81,10 +74,9 @@ class Vocabulary(object):
         print("Words in vocabulary:", len(word_counts))
 
         # Create the vocabulary dictionary
-        for x in word_counts:
+        for i, x in enumerate(word_counts):
             self.reverse_vocab.append(x[0])
-        for (y, x) in enumerate(self.reverse_vocab):
-            self.vocab[x] = y
+            self.vocab[x[0]] = i + 1
         print("Done.")
 
     def word_to_id(self, 
@@ -95,14 +87,14 @@ class Vocabulary(object):
         if word in self.vocab:
             return self.vocab[word]
         else:
-            return self.unk_id
+            return None
 
     def id_to_word(self, 
                    word_id: int):
         """Return word string associated w/ the integer word id.
         """
-        if word_id >= len(self.vocab) or word_id <= -1:
-            return self.unk_word
+        if word_id >= len(self.vocab) or word_id < 0:
+            return None
         else:
             return self.reverse_vocab[word_id]
 
