@@ -95,7 +95,7 @@ class CONLL03(Dataset):
         x = self.vocab.text_to_id(sentence)
 
         # tag2idx
-        tags = self.tags[i]
+        tags = self.labels[i]
         label = []
         for tag in tags:
             label.append(NER_TAGS_CONLL03[tag])
@@ -106,7 +106,9 @@ class CONLL03(Dataset):
         return len(self.sentences)
 
 
-class SplitCONLL03(Dataset):
+class NA_MA_CONLL03(Dataset):
+    """New addition, multiple allowed.
+    """
     def __init__(
         self,
         filename: str,
@@ -136,6 +138,72 @@ class SplitCONLL03(Dataset):
         self.sentences, self.labels = [], []
         for i, sentence in enumerate(sentences):
             label = labels[i]
+            collect = True
+            for tag in tags_to_remove:
+                if tag in label:
+                    collect = False
+            if collect:
+                self.sentences.append(sentence)
+                self.labels.append(label)
+
+        self.class_counts_individual(self.labels)
+
+    def class_counts_individual(self, labels):
+        class_counts = {t: 0 for t in NER_TAGS_CONLL03}
+        for label in labels:
+            tags = sorted(set(label))
+            for tag in tags:
+                class_counts[tag] += 1
+        print(class_counts)
+
+    def __getitem__(self, i):
+        # word2idx
+        sentence = self.sentences[i]
+        x = self.vocab.text_to_id(sentence)
+
+        # tag2idx
+        tags = self.labels[i]
+        label = []
+        for tag in tags:
+            label.append(NER_TAGS_CONLL03[tag])
+
+        return torch.Tensor(x), torch.Tensor(label)
+
+    def __len__(self):
+        return len(self.sentences)
+
+
+class NA_OTO_CONLL03(Dataset):
+    """New addition, one tag only.
+    """
+    def __init__(
+        self,
+        filename: str,
+        tags_to_remove: list,
+        vocab: object = None,
+        ):
+        sentences, labels = load_data(filename)
+        sentences_one, labels_one = [], []
+
+        # Keep only one tag per (tag, O) sentence
+        for i, label in enumerate(labels):
+            tags = sorted(set(label))
+            if len(tags) <= 2:
+                sentences_one.append(sentences[i])
+                labels_one.append(label)
+
+        if vocab is None:
+            self.vocab = Vocabulary()
+            self.vocab.construct(sentences)     # Still use full dataset to construct vocab
+        else:
+            self.vocab = vocab
+        
+
+        self.class_counts_individual(labels_one)
+
+        self.sentences, self.labels = [], []
+        for i, sentence in enumerate(sentences_one):
+            label = labels_one[i]
             collect = True
             for tag in tags_to_remove:
                 if tag in label:

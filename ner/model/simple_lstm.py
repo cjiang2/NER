@@ -46,4 +46,4 @@ class SimpleLSTM(nn.Module):
         out = self.dropout(out)
         out = self.fc(out)
 
-        return out
+        return out.permute(0, 2, 1)
