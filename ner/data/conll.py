@@ -52,11 +52,12 @@ def load_data(
             # End of last sample
             if line.startswith("-DOCSTART-") or line == "" or line == "\n":
                 if tokens:
-                    sentences.append(tokens)
-                    tags.append(ner_tags)
-                    guid += 1
-                    tokens = []
-                    ner_tags = []
+                    if len(tokens) > 0:
+                        sentences.append(tokens)
+                        tags.append(ner_tags)
+                        guid += 1
+                        tokens = []
+                        ner_tags = []
 
             # Sample at the end, append
             else:
@@ -65,9 +66,10 @@ def load_data(
                 ner_tags.append(splits[3].rstrip())
 
         # last sample
-        sentences.append(tokens)
-        tags.append(ner_tags)
-        guid += 1
+        if len(tokens) > 0:
+            sentences.append(tokens)
+            tags.append(ner_tags)
+            guid += 1
 
     # Sanity check
     assert len(sentences) == len(tags)

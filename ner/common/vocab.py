@@ -87,14 +87,14 @@ class Vocabulary(object):
         if word in self.vocab:
             return self.vocab[word]
         else:
-            return None
+            return 0
 
     def id_to_word(self, 
                    word_id: int):
         """Return word string associated w/ the integer word id.
         """
         if word_id >= len(self.vocab) or word_id < 0:
-            return None
+            return 0
         else:
             return self.reverse_vocab[word_id]
 

@@ -17,6 +17,8 @@ config = {
     'batch_size': 32,
     
     'lr': 1e-3,
+
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_normal')
 }
 
 if __name__ == "__main__":
@@ -42,7 +44,7 @@ if __name__ == "__main__":
     train_dataset = conll.CONLL03(train_file)
     valid_dataset = conll.CONLL03(valid_file, vocab=train_dataset.vocab)
     train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
-    valid_loader = conll.get_loader(valid_dataset, batch_size=config['batch_size'])
+    valid_loader = conll.get_loader(valid_dataset, batch_size=1)
 
     # ####################
     # Model setup

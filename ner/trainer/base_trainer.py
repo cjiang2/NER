@@ -6,6 +6,8 @@ import os
 import datetime
 from abc import abstractmethod
 
+import torch
+
 class BaseTrainer:
     """Base class for all trainers.
     """
@@ -51,13 +53,35 @@ class BaseTrainer:
             log = self.train_epoch(epoch)
         print('Training done.')
 
-    @abstractmethod
     def save_checkpoint(
         self, 
         epoch: int,
-        log: dict,
+        save_dir: str,
+        filename: str = None,
         ):
         """Save best checkpoint if possible.
         Invoke _save_checkpoint here.
+        """
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        state = {
+            'epoch': epoch,
+            'log': self.log,
+            'state_dict': self.model.state_dict(),
+        }
+        if filename is None:
+            filename = "model_epoch_{}.pth".format(epoch)
+        torch.save(state, os.path.join(save_dir, filename))
+        print('[!] Model saved at epoch {}.'.format(epoch))
+
+    @abstractmethod
+    def save_best_checkpoint(
+        self, 
+        epoch: int,
+        log_epoch: dict,
+        save_dir: str,
+        ):
+        """Save best training model.
         """
         raise NotImplementedError
