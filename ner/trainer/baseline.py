@@ -6,11 +6,12 @@
 import torch
 import torch.nn.functional as F
 import numpy as np 
-from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
+from seqeval.metrics import precision_score, recall_score, f1_score
 from tqdm import tqdm
 
 from . import BaseTrainer
 from ..utils import Progbar
+from ..data.conll import NER_TAGS_CONLL03_CLASSES
 
 class BaselineTrainer(BaseTrainer):
     def __init__(
@@ -107,12 +108,17 @@ class BaselineTrainer(BaseTrainer):
                 probs = F.softmax(output, dim=1)
                 pred = torch.argmax(probs, dim=1)
 
-                preds += pred.cpu().numpy()[0].tolist()
-                gts += y.numpy()[0].tolist()
+                pred = pred.cpu().numpy()[0].tolist()
+                gt = y.numpy()[0].tolist()
+                pred = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in pred]
+                gt = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in gt]
 
-        precision = precision_score(gts, preds, average='macro', labels=[i for i in range(9)])
-        recall = recall_score(gts, preds, average='macro', labels=[i for i in range(9)])
-        f1 = f1_score(gts, preds, average='macro', labels=[i for i in range(9)])
+                preds.append(pred)
+                gts.append(gt)
+
+        precision = precision_score(gts, preds)
+        recall = recall_score(gts, preds)
+        f1 = f1_score(gts, preds)
         print("Epoch: {}, Precision: {:.6f}, Recall: {:.6f}, F1: {:.6f}\n".format(epoch, precision, recall, f1))
 
         return {'precision': precision, 'recall': recall, 'f1': f1}

@@ -30,6 +30,7 @@ class SimpleLSTM(nn.Module):
                             bidirectional=bidirectional,
                             batch_first=True)
         self.fc = nn.Linear(hidden_dim, num_classes)
+        self.reset_parameters()
 
     def forward(self, x, lens):
         x = self.embed(x)
@@ -47,3 +48,17 @@ class SimpleLSTM(nn.Module):
         out = self.fc(out)
 
         return out.permute(0, 2, 1)
+
+    def reset_parameters(self):
+        #for i in range(4):
+        #    nn.init.orthogonal_(self.lstm_cell.weight_hh.data[self.hidden_size*i:self.hidden_size*(i+1)])
+        for n, _ in self.lstm.named_parameters():
+            print(n)
+        for i in range(4):
+            nn.init.orthogonal_(self.lstm.weight_hh_l0.data[self.hidden_dim*i:self.hidden_dim*(i+1)])
+        for i in range(4):
+            nn.init.orthogonal_(self.lstm.weight_hh_l0_reverse.data[self.hidden_dim*i:self.hidden_dim*(i+1)])
+        nn.init.zeros_(self.lstm.bias_ih_l0)
+        nn.init.zeros_(self.lstm.bias_hh_l0)
+        nn.init.zeros_(self.lstm.bias_ih_l0_reverse)
+        nn.init.zeros_(self.lstm.bias_hh_l0_reverse)

@@ -16,7 +16,7 @@ config = {
     'epochs': 100,
     'batch_size': 32,
     'lr': 1e-3,
-    'weight_decay': 5e-4,
+    'weight_decay': 1e-4,
 
     'hidden_dim': 256,
     'dropout': 0.5,
@@ -51,6 +51,15 @@ if __name__ == "__main__":
     train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
     valid_loader = conll.get_loader(valid_dataset, batch_size=1)
 
+    # print(train_dataset.class_counts)
+    # n_samples = sum(train_dataset.class_counts)
+    # print(n_samples)
+    # weight = torch.zeros(len(train_dataset.class_counts), )
+    # for i, n_samples_class in enumerate(train_dataset.class_counts):
+    #     weight[i] = 1 - (n_samples_class / n_samples)
+    # print(weight)
+    weight = None
+
     # ####################
     # Model setup
     model = SimpleLSTM(
@@ -61,7 +70,7 @@ if __name__ == "__main__":
         embed_dim=config['embed_dim'],
         bidirectional=config['bidirectional'],
     )
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1, weight=weight)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
 
     # ####################

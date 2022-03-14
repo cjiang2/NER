@@ -28,6 +28,18 @@ NER_TAGS_CONLL03 = {
     'I-MISC': 8,
 }
 
+NER_TAGS_CONLL03_CLASSES = [
+    'O', 
+    'B-PER', 
+    'I-PER', 
+    'B-ORG', 
+    'I-ORG', 
+    'B-LOC', 
+    'I-LOC', 
+    'B-MISC', 
+    'I-MISC',
+]
+
 
 # ##########
 
@@ -90,6 +102,15 @@ class CONLL03(Dataset):
             self.vocab.construct(self.sentences)
         else:
             self.vocab = vocab
+
+        self.class_counts = self.class_counts_individual(self.labels)
+
+    def class_counts_individual(self, labels):
+        class_counts = [0 for _ in range(len(NER_TAGS_CONLL03))]
+        for label in labels:
+            for tag in label:
+                class_counts[NER_TAGS_CONLL03[tag]] += 1
+        return class_counts
 
     def __getitem__(self, i):
         # word2idx
