@@ -15,8 +15,13 @@ from ner.trainer.baseline import BaselineTrainer
 config = {
     'epochs': 100,
     'batch_size': 32,
-    
     'lr': 1e-3,
+    'weight_decay': 5e-4,
+
+    'hidden_dim': 256,
+    'dropout': 0.5,
+    'embed_dim': 300,
+    'bidirectional': True,
 
     'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_normal')
 }
@@ -42,15 +47,22 @@ if __name__ == "__main__":
     # {'O': 11162, 'B-PER': 3455, 'I-PER': 2373, 'B-ORG': 3910, 'I-ORG': 1735, 'B-LOC': 4058, 'I-LOC': 697, 'B-MISC': 0, 'I-MISC': 0}
 
     train_dataset = conll.CONLL03(train_file)
-    valid_dataset = conll.CONLL03(valid_file, vocab=train_dataset.vocab)
+    valid_dataset = conll.CONLL03(test_file, vocab=train_dataset.vocab)
     train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
     valid_loader = conll.get_loader(valid_dataset, batch_size=1)
 
     # ####################
     # Model setup
-    model = SimpleLSTM(vocab_size=len(train_dataset.vocab), num_classes=len(conll.NER_TAGS_CONLL03))
+    model = SimpleLSTM(
+        vocab_size=len(train_dataset.vocab), 
+        num_classes=len(conll.NER_TAGS_CONLL03),
+        hidden_dim=config['hidden_dim'],
+        dropout=config['dropout'],
+        embed_dim=config['embed_dim'],
+        bidirectional=config['bidirectional'],
+    )
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
 
     # ####################
     # Train
