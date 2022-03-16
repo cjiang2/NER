@@ -129,73 +129,6 @@ class CONLL03(Dataset):
         return len(self.sentences)
 
 
-class NA_MA_CONLL03(Dataset):
-    """New addition, multiple allowed.
-    """
-    def __init__(
-        self,
-        filename: str,
-        tags_to_remove: list,
-        vocab: object = None,
-        ):
-        sentences, labels = load_data(filename)
-
-        if vocab is None:
-            self.vocab = Vocabulary()
-            self.vocab.construct(sentences)
-        else:
-            self.vocab = vocab
-
-        # Do some class summary here
-        labels_unique = {}
-        for label in labels:
-            tags = ', '.join(sorted(set(label)))
-
-            if tags not in labels_unique:
-                labels_unique[tags] = 1
-            else:
-                labels_unique[tags] += 1
-        
-        self.class_counts_individual(labels)
-
-        self.sentences, self.labels = [], []
-        for i, sentence in enumerate(sentences):
-            label = labels[i]
-            collect = True
-            for tag in tags_to_remove:
-                if tag in label:
-                    collect = False
-            if collect:
-                self.sentences.append(sentence)
-                self.labels.append(label)
-
-        self.class_counts_individual(self.labels)
-
-    def class_counts_individual(self, labels):
-        class_counts = {t: 0 for t in NER_TAGS_CONLL03}
-        for label in labels:
-            tags = sorted(set(label))
-            for tag in tags:
-                class_counts[tag] += 1
-        print(class_counts)
-
-    def __getitem__(self, i):
-        # word2idx
-        sentence = self.sentences[i]
-        x = self.vocab.text_to_id(sentence)
-
-        # tag2idx
-        tags = self.labels[i]
-        label = []
-        for tag in tags:
-            label.append(NER_TAGS_CONLL03[tag])
-
-        return torch.Tensor(x), torch.Tensor(label)
-
-    def __len__(self):
-        return len(self.sentences)
-
-
 class NA_OTO_CONLL03(Dataset):
     """New addition, one tag only.
     """
@@ -205,6 +138,7 @@ class NA_OTO_CONLL03(Dataset):
         tags_to_remove: list,
         vocab: object = None,
         ):
+        self.tags_to_remove = tags_to_remove
         sentences, labels = load_data(filename)
         sentences_one, labels_one = [], []
 
@@ -220,9 +154,8 @@ class NA_OTO_CONLL03(Dataset):
             self.vocab.construct(sentences)     # Still use full dataset to construct vocab
         else:
             self.vocab = vocab
-        
 
-        self.class_counts_individual(labels_one)
+        self.sentence_counts_individual(labels_one)
 
         self.sentences, self.labels = [], []
         for i, sentence in enumerate(sentences_one):
@@ -235,15 +168,15 @@ class NA_OTO_CONLL03(Dataset):
                 self.sentences.append(sentence)
                 self.labels.append(label)
 
-        self.class_counts_individual(self.labels)
+        self.sentence_counts_individual(self.labels)
 
-    def class_counts_individual(self, labels):
-        class_counts = {t: 0 for t in NER_TAGS_CONLL03}
+    def sentence_counts_individual(self, labels):
+        sentence_counts = {t: 0 for t in NER_TAGS_CONLL03}
         for label in labels:
-            tags = sorted(set(label))
+            tags = sorted(set(label))   # Count No. sentneces w/ that tag
             for tag in tags:
-                class_counts[tag] += 1
-        print(class_counts)
+                sentence_counts[tag] += 1
+        print(sentence_counts)
 
     def __getitem__(self, i):
         # word2idx
