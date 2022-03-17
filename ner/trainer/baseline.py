@@ -16,6 +16,7 @@ from ..data.conll import NER_TAGS_CONLL03_CLASSES
 class BaselineTrainer(BaseTrainer):
     def __init__(
         self,
+        name,
         config,
         train_loader,
         valid_loader,
@@ -23,7 +24,7 @@ class BaselineTrainer(BaseTrainer):
         criterion,
         optimizer,
         ):
-        super().__init__(config)
+        super().__init__(name, config)
         self.train_loader = train_loader
         self.valid_loader = valid_loader
         self.model = model.cuda()
@@ -87,7 +88,7 @@ class BaselineTrainer(BaseTrainer):
         """
         if log_epoch['f1'] > self.log['f1']:
             self.log = log_epoch
-            filename = "model_epoch_{}_f1_{:.6f}.pth".format(epoch, self.log['f1'])
+            filename = "{}.pth".format(self.name)
             self.save_checkpoint(epoch, save_dir, filename)
 
     def valid_epoch(

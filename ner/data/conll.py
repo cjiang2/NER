@@ -155,7 +155,7 @@ class NA_OTO_CONLL03(Dataset):
         else:
             self.vocab = vocab
 
-        self.sentence_counts_individual(labels_one)
+        #self.sentence_counts_individual(labels_one)
 
         self.sentences, self.labels = [], []
         for i, sentence in enumerate(sentences_one):

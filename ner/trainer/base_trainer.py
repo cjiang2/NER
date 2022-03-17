@@ -13,8 +13,10 @@ class BaseTrainer:
     """
     def __init__(
         self,
+        name: str,
         config,
         ) -> None:
+        self.name = name
         self.config = config
         
         self.start_epoch = 1

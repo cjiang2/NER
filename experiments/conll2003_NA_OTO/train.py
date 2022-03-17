@@ -13,12 +13,13 @@ from ner.model.simple_lstm import SimpleLSTM
 from ner.trainer.baseline import BaselineTrainer
 
 config = {
-    'epochs': 100,
+    'epochs': 5,
     'batch_size': 32,
-    
     'lr': 1e-3,
 
-    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_normal')
+    'vocab_size': 23623,
+
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_na_oto_normal')
 }
 
 if __name__ == "__main__":
@@ -29,38 +30,81 @@ if __name__ == "__main__":
     test_file = os.path.join(ROOT_DIR, 'data', 'conll2003', 'test.txt')
 
     all_tags = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC']
-    tasks = [
-        ['B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC'],
-        ['B-LOC', 'I-LOC', 'B-MISC', 'I-MISC'],
-        ['B-MISC', 'I-MISC'],
+
+    exps = [
+        [   # Experiment 1
+            # Task 1: 
+                # First train w/ samples w/o 'B-MISC', 'I-MISC' tags
+                # Then train w/ samples w 'B-MISC', 'I-MISC' tags only
+            ['B-MISC', 'I-MISC'], 
+            ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'],
+        ],
     ]
-
-    #{'O': 13769, 'B-PER': 4373, 'I-PER': 2964, 'B-ORG': 4587, 'I-ORG': 2080, 'B-LOC': 5127, 'I-LOC': 949, 'B-MISC': 2698, 'I-MISC': 800}
-    
-    # {'O': 4135, 'B-PER': 1308, 'I-PER': 649, 'B-ORG': 0, 'I-ORG': 0, 'B-LOC': 0, 'I-LOC': 0, 'B-MISC': 0, 'I-MISC': 0}
-    # {'O': 7126, 'B-PER': 1810, 'I-PER': 970, 'B-ORG': 3068, 'I-ORG': 1396, 'B-LOC': 0, 'I-LOC': 0, 'B-MISC': 0, 'I-MISC': 0}
-    # {'O': 11162, 'B-PER': 3455, 'I-PER': 2373, 'B-ORG': 3910, 'I-ORG': 1735, 'B-LOC': 4058, 'I-LOC': 697, 'B-MISC': 0, 'I-MISC': 0}
-
-    train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=['B-MISC', 'I-MISC'])
-    #exit()
-    valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=['B-MISC', 'I-MISC'])
-    train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
-    valid_loader = conll.get_loader(valid_dataset, batch_size=1)
 
     # ####################
     # Model setup
-    model = SimpleLSTM(vocab_size=len(train_dataset.vocab), num_classes=len(conll.NER_TAGS_CONLL03))
+    model = SimpleLSTM(vocab_size=23623, num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
 
-    # ####################
-    # Train
-    trainer = BaselineTrainer(
-        config=config,
-        train_loader=train_loader,
-        valid_loader=valid_loader,
-        model=model,
-        criterion=criterion,
-        optimizer=optimizer,
-        )
-    trainer.train()
+    # Convenience: Do all experiments in one script
+    for exp in exps:
+
+        # New Addition, One-tag-Only
+        for task_idx, task in enumerate(exp):
+            print("#"*30)
+            print("Starting task:", task_idx + 1)
+            print("Tags to remove from this task:", task)
+            print("#"*30)
+            name = "NA_OTO_task_{}".format(task_idx + 1)
+
+            train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=task)
+            valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task)
+            train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
+            valid_loader = conll.get_loader(valid_dataset, batch_size=1)
+
+            # Optimizer needs to be reinitialized for every task, w/o CL trainer
+            optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+
+            # Load the last known best model, if available
+            if os.path.exists(os.path.join(config['save_dir'], name + '.pth')):
+                checkpoint = torch.load(os.path.join(config['save_dir'], name + '.pth'))
+                model.load_state_dict(checkpoint['state_dict'])
+                print("[!] Used best weights from prev task {}".format(task_idx))
+    
+            # ####################
+            # Train
+            # Create a new trainer for each task, if using a baseline training method
+            trainer = BaselineTrainer(
+                name=name,
+                config=config,
+                train_loader=train_loader,
+                valid_loader=valid_loader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                )
+            trainer.train()
+
+        # Re-evaluate preformance on previous task
+        name = "NA_OTO_task_{}".format(task_idx + 1)
+        checkpoint = torch.load(os.path.join(config['save_dir'], name + '.pth'))
+        model.load_state_dict(checkpoint['state_dict'])
+        print("[!] Loaded latest task {}'s best weight.".format(task_idx + 1))
+        valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=exp[0])
+        valid_loader = conll.get_loader(valid_dataset, batch_size=1)
+
+        trainer = BaselineTrainer(
+                name=name,
+                config=config,
+                train_loader=None,
+                valid_loader=valid_loader,
+                model=model,
+                criterion=criterion,
+                optimizer=None,
+                )
+        log = trainer.valid_epoch(0)
+
+        name = "NA_OTO_task_{}".format(task_idx)
+        checkpoint = torch.load(os.path.join(config['save_dir'], name + '.pth'))
+        log_prev = checkpoint['log']
+        print("Prev Performance:", log_prev)
