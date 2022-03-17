@@ -13,7 +13,7 @@ from ner.model.simple_lstm import SimpleLSTM
 from ner.trainer.baseline import BaselineTrainer
 
 config = {
-    'epochs': 5,
+    'epochs': 50,
     'batch_size': 32,
     'lr': 1e-3,
 

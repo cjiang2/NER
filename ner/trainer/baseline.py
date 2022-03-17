@@ -86,7 +86,7 @@ class BaselineTrainer(BaseTrainer):
         ):
         """Save best training model.
         """
-        if log_epoch['f1'] > self.log['f1']:
+        if log_epoch['f1'] >= self.log['f1']:
             self.log = log_epoch
             filename = "{}.pth".format(self.name)
             self.save_checkpoint(epoch, save_dir, filename)
