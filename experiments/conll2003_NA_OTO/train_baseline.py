@@ -1,3 +1,9 @@
+"""
+Baseline train script.
+
+No CL method involved.
+"""
+
 import os
 import sys
 
@@ -35,10 +41,27 @@ if __name__ == "__main__":
         [   # Experiment 1
             # Task 1: 
                 # First train w/ samples w/o 'B-MISC', 'I-MISC' tags
+            # Task 2:
                 # Then train w/ samples w 'B-MISC', 'I-MISC' tags only
             ['B-MISC', 'I-MISC'], 
-            ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'],
+            ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'],
         ],
+
+        # [   # Experiment 2: 'B-LOC', 'I-LOC'
+        #     ['B-LOC', 'I-LOC'], 
+        #     ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-MISC', 'I-MISC'],
+        # ],
+
+        # [   # Experiment 3: 'B-ORG', 'I-ORG'
+        #     ['B-ORG', 'I-ORG'], 
+        #     ['B-PER', 'I-PER', 'B-MISC', 'I-MISC', 'B-LOC', 'I-LOC'],
+        # ],
+
+        # [   # Experiment 4: 'B-PER', 'I-PER'
+        #     ['B-ORG', 'I-ORG'], 
+        #     ['B-MISC', 'I-MISC', 'B-LOC', 'I-LOC', 'B-ORG', 'I-ORG'],
+        # ],
+
     ]
 
     # ####################
@@ -108,3 +131,4 @@ if __name__ == "__main__":
         checkpoint = torch.load(os.path.join(config['save_dir'], name + '.pth'))
         log_prev = checkpoint['log']
         print("Prev Performance:", log_prev)
+        print("New Performance:", log)
