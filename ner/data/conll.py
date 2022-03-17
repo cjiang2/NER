@@ -130,24 +130,33 @@ class CONLL03(Dataset):
 
 
 class NA_OTO_CONLL03(Dataset):
-    """New addition, one tag only.
+    """New addition
+    Allow toggling between 
+        one-tag-only
+        multiple-allowed.
     """
     def __init__(
         self,
         filename: str,
         tags_to_remove: list,
+        multiple_allowed: bool = False,
         vocab: object = None,
         ):
         self.tags_to_remove = tags_to_remove
+        self.multiple_allowed = multiple_allowed
         sentences, labels = load_data(filename)
         sentences_one, labels_one = [], []
 
         # Keep only one tag per (tag, O) sentence
-        for i, label in enumerate(labels):
-            tags = sorted(set(label))
-            if len(tags) <= 2:
-                sentences_one.append(sentences[i])
-                labels_one.append(label)
+        if not self.multiple_allowed:
+            for i, label in enumerate(labels):
+                tags = sorted(set(label))
+                if len(tags) <= 2:
+                    sentences_one.append(sentences[i])
+                    labels_one.append(label)
+        else:
+            # Allow multiple tags to be in one sentence
+            sentences_one, labels_one = sentences, labels
 
         if vocab is None:
             self.vocab = Vocabulary()
@@ -168,7 +177,7 @@ class NA_OTO_CONLL03(Dataset):
                 self.sentences.append(sentence)
                 self.labels.append(label)
 
-        self.sentence_counts_individual(self.labels)
+        self.sentence_counts = self.sentence_counts_individual(self.labels)
 
     def sentence_counts_individual(self, labels):
         sentence_counts = {t: 0 for t in NER_TAGS_CONLL03}
@@ -177,6 +186,7 @@ class NA_OTO_CONLL03(Dataset):
             for tag in tags:
                 sentence_counts[tag] += 1
         print(sentence_counts)
+        return sentence_counts
 
     def __getitem__(self, i):
         # word2idx

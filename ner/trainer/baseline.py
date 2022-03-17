@@ -78,6 +78,15 @@ class BaselineTrainer(BaseTrainer):
 
         return log
 
+    def train(
+        self,
+        ):
+        """Generic training loop.
+        """
+        for epoch in range(self.start_epoch, self.config["epochs"] + 1):
+            log = self.train_epoch(epoch)
+        print('Training done.')
+
     def save_best_checkpoint(
         self, 
         epoch: int,

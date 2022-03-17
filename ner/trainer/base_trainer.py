@@ -46,14 +46,11 @@ class BaseTrainer:
         """
         raise NotImplementedError
 
+    @abstractmethod
     def train(
         self,
         ):
-        """Generic training loop.
-        """
-        for epoch in range(self.start_epoch, self.config["epochs"] + 1):
-            log = self.train_epoch(epoch)
-        print('Training done.')
+        raise NotImplementedError
 
     def save_checkpoint(
         self, 
