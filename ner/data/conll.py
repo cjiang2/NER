@@ -140,6 +140,7 @@ class NA_OTO_CONLL03(Dataset):
         filename: str,
         tags_to_remove: list,
         multiple_allowed: bool = False,
+        reversed: bool = False,
         vocab: object = None,
         ):
         self.tags_to_remove = tags_to_remove
@@ -164,7 +165,7 @@ class NA_OTO_CONLL03(Dataset):
         else:
             self.vocab = vocab
 
-        #self.sentence_counts_individual(labels_one)
+        self.sentence_counts_individual(labels_one)
 
         self.sentences, self.labels = [], []
         for i, sentence in enumerate(sentences_one):
@@ -173,9 +174,13 @@ class NA_OTO_CONLL03(Dataset):
             for tag in tags_to_remove:
                 if tag in label:
                     collect = False
-            if collect:
+            if collect and not reversed:
                 self.sentences.append(sentence)
                 self.labels.append(label)
+            else:
+                if reversed and not collect:
+                    self.sentences.append(sentence)
+                    self.labels.append(label)
 
         self.sentence_counts = self.sentence_counts_individual(self.labels)
 

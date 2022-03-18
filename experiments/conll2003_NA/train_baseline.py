@@ -4,6 +4,7 @@ Baseline train script.
 No CL method involved.
 """
 
+from audioop import reverse
 import os
 import sys
 
@@ -23,11 +24,11 @@ config = {
     'batch_size': 32,
     'lr': 1e-3,
 
-    'vocab_size': 23623,
+    'vocab_size': 23624,
 
     'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_na_normal'),
 
-    'multiple_allowed': False,
+    'multiple_allowed': True,
 }
 
 if __name__ == "__main__":
@@ -45,54 +46,55 @@ if __name__ == "__main__":
                 # First train w/ samples w/o 'B-MISC', 'I-MISC' tags
             # Task 2:
                 # Then train w/ samples w 'B-MISC', 'I-MISC' tags only
-            ['B-MISC', 'I-MISC'], 
-            ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'],
+            'B-MISC', 'I-MISC',
         ],
 
         [   # Experiment 2: 'B-LOC', 'I-LOC'
-            ['B-LOC', 'I-LOC'], 
-            ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-MISC', 'I-MISC'],
+            'B-LOC', 'I-LOC',
         ],
 
         [   # Experiment 3: 'B-ORG', 'I-ORG'
-            ['B-ORG', 'I-ORG'], 
-            ['B-PER', 'I-PER', 'B-MISC', 'I-MISC', 'B-LOC', 'I-LOC'],
+            'B-ORG', 'I-ORG',
         ],
 
         [   # Experiment 4: 'B-PER', 'I-PER'
-            ['B-PER', 'I-PER'], 
-            ['B-MISC', 'I-MISC', 'B-LOC', 'I-LOC', 'B-ORG', 'I-ORG'],
+            'B-PER', 'I-PER',
         ],
 
     ]
 
     # ####################
     # Model setup
-    model = SimpleLSTM(vocab_size=23623, num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
+    model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
     # Convenience: Do all experiments in one script
-    for exp_i, exp in enumerate(exps):
+    for exp_i, task in enumerate(exps):
         # Record
         if config["multiple_allowed"]:
             postfix = "MA"
         else:
             postfix = "OTO"
         f = open('exp_{}_{}.txt'.format(exp_i + 1, postfix), 'w')
-        f.write("Task: {}\n".format(exp))
+        f.write("Task: {}\n".format(task))
 
         # New Addition, One-tag-Only
-        for task_idx, task in enumerate(exp):
+        for task_idx in range(2):
             print("#"*30)
             print("Starting task:", task_idx + 1)
-            print("Tags to remove from this task:", task)
             print("#"*30)
             name = "exp_{}_NA_{}_task_{}".format(exp_i + 1, postfix, task_idx + 1)
 
-            train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=task, multiple_allowed=config['multiple_allowed'])
-            valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task, multiple_allowed=config['multiple_allowed'])
+            if task_idx >= 1:
+                reversed = True
+            else:
+                reversed = False
+
+            train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=task, multiple_allowed=config['multiple_allowed'], reversed=reversed)
+            valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task, multiple_allowed=config['multiple_allowed'], reversed=reversed)
             train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
             valid_loader = conll.get_loader(valid_dataset, batch_size=1)
+            print(len(train_dataset.vocab))
 
             # Write
             f.write("Task {}: trainset sentence counts: {}\n".format(task_idx + 1, train_dataset.sentence_counts))
@@ -126,7 +128,7 @@ if __name__ == "__main__":
         checkpoint = torch.load(os.path.join(config['save_dir'], name + '.pth'))
         model.load_state_dict(checkpoint['state_dict'])
         print("[!] Loaded latest task {}'s best weight.".format(task_idx + 1))
-        valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=exp[0])
+        valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task, multiple_allowed=config['multiple_allowed'])
         valid_loader = conll.get_loader(valid_dataset, batch_size=1)
 
         # Lazy Way: just do another trainer and force using valid_epoch
