@@ -59,25 +59,25 @@ class Vocabulary(object):
         ):
         """Construct vocabulary from a list of texts.
         """
-        print("Creating vocabulary...")
+        #print("Creating vocabulary...")
 
         counter = Counter()
         for text in texts:
             tokenized_text = process_text(text)
             counter.update(tokenized_text)
-        print("Total words:", len(counter))
+        #print("Total words:", len(counter))
 
         # Filter uncommon words and sort by descending count.
         word_counts = [x for x in counter.items() if x[1] >= min_word_count]
         #print(word_counts)
         word_counts.sort(key=lambda x: x[1], reverse=True)
-        print("Words in vocabulary:", len(word_counts))
+        #print("Words in vocabulary:", len(word_counts))
 
         # Create the vocabulary dictionary
         for i, x in enumerate(word_counts):
             self.reverse_vocab.append(x[0])
             self.vocab[x[0]] = i + 1
-        print("Done.")
+        #print("Done.")
 
     def word_to_id(self, 
                    word: str):

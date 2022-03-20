@@ -190,7 +190,7 @@ class NA_OTO_CONLL03(Dataset):
             tags = sorted(set(label))   # Count No. sentneces w/ that tag
             for tag in tags:
                 sentence_counts[tag] += 1
-        print(sentence_counts)
+        #print(sentence_counts)
         return sentence_counts
 
     def __getitem__(self, i):

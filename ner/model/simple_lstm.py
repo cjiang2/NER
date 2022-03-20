@@ -52,8 +52,8 @@ class SimpleLSTM(nn.Module):
     def reset_parameters(self):
         #for i in range(4):
         #    nn.init.orthogonal_(self.lstm_cell.weight_hh.data[self.hidden_size*i:self.hidden_size*(i+1)])
-        for n, _ in self.lstm.named_parameters():
-            print(n)
+        #for n, _ in self.lstm.named_parameters():
+            #print(n)
         for i in range(4):
             nn.init.orthogonal_(self.lstm.weight_hh_l0.data[self.hidden_dim*i:self.hidden_dim*(i+1)])
         for i in range(4):

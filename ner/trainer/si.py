@@ -3,6 +3,8 @@ Trainer with Synatic Intelligence.
 
 """
 
+import os
+
 import torch
 import torch.nn.functional as F
 import numpy as np 
@@ -36,7 +38,7 @@ class SITrainer(BaseTrainer):
             self.model = self.model.cuda()
             self.criterion = self.criterion.cuda()
 
-        self.logs = None
+        self.log = {'f1': 0.0}
 
         # SI
         self._si_init()
@@ -55,6 +57,7 @@ class SITrainer(BaseTrainer):
                 self.prev_params[n] = p.clone().detach()
                 self.w[n] = torch.zeros(p.shape).float().to(p.device)
                 self.omega[n] = torch.zeros(p.shape).float().to(p.device)
+        print(self.params_name)
 
     def train_step(
         self,
@@ -68,6 +71,7 @@ class SITrainer(BaseTrainer):
             target = batch[1].cuda()
         lens = batch[2]
         #print(x.shape)
+        # Inference
         output = self.model(x, lens)
 
         # Collect unregularized gradients
@@ -100,6 +104,7 @@ class SITrainer(BaseTrainer):
         return {'loss': loss}
 
     def on_update(self):
+        print("Updating omega...")
         # Calculate regularization strength
         for n, p in self.model.named_parameters():
             if n in self.params_name:
@@ -114,8 +119,7 @@ class SITrainer(BaseTrainer):
         self,
         epoch: int,
         train_loader,
-        valid_loaders,
-        task_idx: int,
+        valid_loader,
         ):
         # Setup progbar
         pbar = Progbar(target=len(train_loader), 
@@ -128,91 +132,109 @@ class SITrainer(BaseTrainer):
             pbar.update(batch_idx + 1, values=[('loss', result['loss'])])
 
         # Valid
-        if valid_loaders is not None:
-            logs = self.valid_epoch(epoch, valid_loaders)
+        if valid_loader is not None:
+            log = self.valid_epoch(epoch, valid_loader)
 
         # Save best valid f1
-        self.save_best_checkpoint(epoch, logs, self.config['save_dir'], task_idx)
+        self.save_best_checkpoint(epoch, log, self.config['save_dir'])
 
-        return logs
+        return log
 
     def train(
         self,
         train_loader,
-        valid_loaders,
-        task_idx: int,
+        valid_loader,
         ):
         """Generic training loop.
         """
         for epoch in range(self.start_epoch, self.config["epochs"] + 1):
-            log = self.train_epoch(epoch, train_loader, valid_loaders, task_idx)
-
-        print('Training done. Updaing importance params...')
-
-        # #####
-        # SI
-        # Update omega and the referene weights, set parameter importance to 0
-        # #####
-        self.on_update()
+            log = self.train_epoch(epoch, train_loader, valid_loader)
         print('Done.')
 
 
     def save_best_checkpoint(
         self, 
         epoch: int,
-        logs: dict,
+        log: dict,
         save_dir: str,
-        task_idx: int,
         ):
-        """Save best training model.
+        """Save latest training model.
         """
-        if logs['f1'][task_idx] >= self.logs['f1'][task_idx]:
-            self.logs = logs
+        if log['f1'] >= self.log['f1']:
+            self.log = log
             filename = "{}.pth".format(self.name)
             self.save_checkpoint(epoch, save_dir, filename)
+
+    def save_checkpoint(
+        self, 
+        epoch: int,
+        save_dir: str,
+        filename: str,
+        ):
+        """Save best checkpoint if possible.
+        Invoke _save_checkpoint here.
+        """
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        state = {
+            'epoch': epoch,
+            'log': self.log,
+            'state_dict': self.model.state_dict(),
+            'w': self.w,
+            'omega': self.omega,
+            'params_name': self.params_name,
+            'prev_params': self.prev_params,
+        }
+        
+        torch.save(state, os.path.join(save_dir, filename))
+        print('[!] Model saved at epoch {}.'.format(epoch))
+
+    def load_checkpoint(
+        self,
+        filepath: str,
+        ):
+        checkpoint = torch.load(filepath)
+        self.model.load_state_dict(checkpoint['state_dict'])
+        self.w = checkpoint['w']
+        self.omega = checkpoint['omega']
+        self.params_name = checkpoint['params_name']
+        self.prev_params = checkpoint['prev_params']
+        print("Loaded previous best model.")
+
+        # Force an omega update for the best model
+        self.on_update()
+
+        return checkpoint['log']
 
     def valid_epoch(
         self,
         epoch: int,
-        valid_loaders,
+        valid_loader,
         ):
         print("\n Eval...")
         self.model.eval()
         preds, gts = [], []
 
-        if self.logs is None:
-            self.logs = {
-                'f1': [0.0 for _ in range(len(valid_loaders))], 
-                'precision': [0.0 for _ in range(len(valid_loaders))], 
-                'recall': [0.0 for _ in range(len(valid_loaders))]}
+        with torch.no_grad():
+            for idx, batch in tqdm(enumerate(valid_loader)):
+                if torch.cuda.is_available():
+                    x = batch[0].cuda()
+                y = batch[1]
+                lens = batch[2]
+                output = self.model(x, lens)
+                probs = F.softmax(output, dim=1)
+                pred = torch.argmax(probs, dim=1)
 
-        logs = {'f1': [], 'precision': [], 'recall': []}
+                pred = pred.cpu().numpy()[0].tolist()
+                gt = y.numpy()[0].tolist()
+                pred = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in pred]
+                gt = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in gt]
 
-        for task_idx, valid_loader in enumerate(valid_loaders):
-            with torch.no_grad():
-                for idx, batch in tqdm(enumerate(valid_loader)):
-                    if torch.cuda.is_available():
-                        x = batch[0].cuda()
-                    y = batch[1]
-                    lens = batch[2]
-                    output = self.model(x, lens)
-                    probs = F.softmax(output, dim=1)
-                    pred = torch.argmax(probs, dim=1)
+                preds.append(pred)
+                gts.append(gt)
 
-                    pred = pred.cpu().numpy()[0].tolist()
-                    gt = y.numpy()[0].tolist()
-                    pred = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in pred]
-                    gt = [NER_TAGS_CONLL03_CLASSES[class_idx] for class_idx in gt]
+        f1 = f1_score(gts, preds)
+        print("Epoch: {}, F1: {:.6f}\n".format(epoch, f1))
 
-                    preds.append(pred)
-                    gts.append(gt)
-
-            precision = precision_score(gts, preds)
-            recall = recall_score(gts, preds)
-            f1 = f1_score(gts, preds)
-            print("Epoch: {}, Precision: {:.6f}, Recall: {:.6f}, F1: {:.6f}\n".format(epoch, precision, recall, f1))
-            logs['f1'].append(f1)
-            logs['precision'].append(precision)
-            logs['recall'].append(recall)
-
-        return logs
+        return {'f1': f1}

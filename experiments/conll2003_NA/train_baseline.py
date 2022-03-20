@@ -4,7 +4,6 @@ Baseline train script.
 No CL method involved.
 """
 
-from audioop import reverse
 import os
 import sys
 
@@ -18,10 +17,11 @@ from ner.data import conll
 from ner.common import Vocabulary, maxlen
 from ner.model.simple_lstm import SimpleLSTM
 from ner.trainer.baseline import BaselineTrainer
+from ner.common.word2vec import get_embed_matrix
 
 config = {
-    'epochs': 50,
-    'batch_size': 32,
+    'epochs': 20,
+    'batch_size': 64,
     'lr': 1e-3,
 
     'vocab_size': 23624,
@@ -29,6 +29,8 @@ config = {
     'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_na_normal'),
 
     'multiple_allowed': True,
+
+    'word2vec': os.path.join(ROOT_DIR, 'checkpoints', 'GoogleNews-vectors-negative300.bin'),
 }
 
 if __name__ == "__main__":
@@ -67,6 +69,18 @@ if __name__ == "__main__":
     # Model setup
     model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+
+    # Load a pretrained embedding matrix
+    if config['word2vec'] is not None:
+        train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=[], multiple_allowed=config['multiple_allowed'], reversed=reversed)
+        vocab = train_dataset.vocab
+        embed_mat = get_embed_matrix(config['word2vec'], 
+                        embed_dim=300,
+                        vocab=vocab)
+        print(embed_mat.shape)
+        model.embed.weight.data = torch.from_numpy(embed_mat).float()
+
+    model.embed.requires_grad = False
 
     # Convenience: Do all experiments in one script
     for exp_i, task in enumerate(exps):
@@ -149,6 +163,6 @@ if __name__ == "__main__":
         print("Prev Performance:", log_prev)
         print("New Performance:", log)
 
-        f.write("Prev Best Metric: {}\n".format(log_prev))
-        f.write("Curr Best Metric: {}\n".format(log))
+        f.write("Prev Best Metric: {}\n".format(log_prev['f1']))
+        f.write("Curr Best Metric: {}\n".format(log['f1']))
         f.close()

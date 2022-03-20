@@ -95,10 +95,10 @@ class BaselineTrainer(BaseTrainer):
         ):
         """Save best training model.
         """
-        if log_epoch['f1'] >= self.log['f1']:
-            self.log = log_epoch
-            filename = "{}.pth".format(self.name)
-            self.save_checkpoint(epoch, save_dir, filename)
+        #if log_epoch['f1'] >= self.log['f1']:
+        self.log = log_epoch
+        filename = "{}.pth".format(self.name)
+        self.save_checkpoint(epoch, save_dir, filename)
 
     def valid_epoch(
         self,
