@@ -17,7 +17,6 @@ sys.path.append(ROOT_DIR)  # To find local version of the library
 from ner.data import conll
 from ner.common import Vocabulary, maxlen
 from ner.model.simple_lstm import SimpleLSTM
-from ner.trainer.si import SITrainer
 from ner.trainer.baseline import BaselineTrainer
 from ner.common.word2vec import get_embed_matrix
 
@@ -28,10 +27,7 @@ config = {
 
     'vocab_size': 23624,
 
-    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_si'),
-
-    'si_c': 0.5,
-    'si_epsilon': 0.1,
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_normal'),
 
     'word2vec': os.path.join(ROOT_DIR, 'checkpoints', 'GoogleNews-vectors-negative300.bin'),
     #'word2vec': None,
@@ -79,7 +75,7 @@ def main():
 
     # Convenience: Do all experiments in one script
     for exp_i, tasks in enumerate(exps):
-        f = open('exp_{}_si.txt'.format(exp_i + 1, exp_i), 'a')
+        f = open('exp_{}_normal.txt'.format(exp_i + 1, exp_i), 'a')
         f.write("Tasks: {}\n".format(tasks))
 
         # Construct all datasets
@@ -95,14 +91,12 @@ def main():
 
         # Optimizer reinitialized for every task
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config['lr'])
-        trainer = SITrainer(
+        trainer = BaselineTrainer(
                 name=None,
                 config=config,
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
-                si_c=config['si_c'],
-                si_epsilon=config['si_epsilon'],
                 )
 
         log_prev = []

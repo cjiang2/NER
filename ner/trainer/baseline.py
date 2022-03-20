@@ -18,15 +18,11 @@ class BaselineTrainer(BaseTrainer):
         self,
         name,
         config,
-        train_loader,
-        valid_loader,
         model,
         criterion,
         optimizer,
         ):
         super().__init__(name, config)
-        self.train_loader = train_loader
-        self.valid_loader = valid_loader
         self.model = model.cuda()
         self.criterion = criterion.cuda()
         self.optimizer = optimizer
@@ -59,19 +55,21 @@ class BaselineTrainer(BaseTrainer):
     def train_epoch(
         self,
         epoch: int,
+        train_loader,
+        valid_loader,
         ):
         # Setup progbar
-        pbar = Progbar(target=len(self.train_loader), 
+        pbar = Progbar(target=len(train_loader), 
                 epoch=epoch, 
                 num_epochs=self.config['epochs'])
 
         self.model.train()
-        for batch_idx, batch in enumerate(self.train_loader):
+        for batch_idx, batch in enumerate(train_loader):
             result = self.train_step(batch, batch_idx)
             pbar.update(batch_idx + 1, values=[('loss', result['loss'])])
 
-        if self.valid_loader is not None:
-            log = self.valid_epoch(epoch)
+        if valid_loader is not None:
+            log = self.valid_epoch(epoch, valid_loader)
 
         # Save best valid f1
         self.save_best_checkpoint(epoch, log, self.config['save_dir'])
@@ -80,11 +78,13 @@ class BaselineTrainer(BaseTrainer):
 
     def train(
         self,
+        train_loader,
+        valid_loader,
         ):
         """Generic training loop.
         """
         for epoch in range(self.start_epoch, self.config["epochs"] + 1):
-            log = self.train_epoch(epoch)
+            log = self.train_epoch(epoch, train_loader, valid_loader)
         print('Training done.')
 
     def save_best_checkpoint(
@@ -100,16 +100,27 @@ class BaselineTrainer(BaseTrainer):
         filename = "{}.pth".format(self.name)
         self.save_checkpoint(epoch, save_dir, filename)
 
+    def load_checkpoint(
+        self,
+        filepath: str,
+        ):
+        checkpoint = torch.load(filepath)
+        self.model.load_state_dict(checkpoint['state_dict'])
+        print("Loaded previous best model.")
+
+        return checkpoint['log']
+
     def valid_epoch(
         self,
         epoch: int,
+        valid_loader,
         ):
         print("\n Eval...")
         self.model.eval()
         preds, gts = [], []
 
         with torch.no_grad():
-            for idx, batch in tqdm(enumerate(self.valid_loader)):
+            for idx, batch in tqdm(enumerate(valid_loader)):
                 if torch.cuda.is_available():
                     x = batch[0].cuda()
                 y = batch[1]
@@ -126,9 +137,7 @@ class BaselineTrainer(BaseTrainer):
                 preds.append(pred)
                 gts.append(gt)
 
-        precision = precision_score(gts, preds)
-        recall = recall_score(gts, preds)
         f1 = f1_score(gts, preds)
-        print("Epoch: {}, Precision: {:.6f}, Recall: {:.6f}, F1: {:.6f}\n".format(epoch, precision, recall, f1))
+        print("Epoch: {}, F1: {:.6f}\n".format(epoch, f1))
 
-        return {'precision': precision, 'recall': recall, 'f1': f1}
+        return {'f1': f1}
