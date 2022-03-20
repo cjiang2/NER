@@ -23,7 +23,7 @@ class SimpleLSTM(nn.Module):
         self.bidirectional = bidirectional
 
         self.embed = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.dropout = nn.Dropout(dropout)
+        #self.dropout = nn.Dropout(dropout)
 
         self.lstm = nn.LSTM(embed_dim, self.hidden_dim, 
                             num_layers=num_layers, 
@@ -44,7 +44,7 @@ class SimpleLSTM(nn.Module):
         # Recover
         out, _ = pad_packed_sequence(out, batch_first=True)
 
-        out = self.dropout(out)
+        #out = self.dropout(out)
         out = self.fc(out)
 
         return out.permute(0, 2, 1)

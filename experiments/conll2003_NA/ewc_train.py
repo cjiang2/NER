@@ -16,9 +16,9 @@ sys.path.append(ROOT_DIR)  # To find local version of the library
 
 from ner.data import conll
 from ner.common import Vocabulary, maxlen
-#from ner.model.simple_lstm import SimpleLSTM
+from ner.model.simple_lstm import SimpleLSTM
 from ner.model.simple_fc import SimpleFC
-from ner.trainer.si import SITrainer
+from ner.trainer.ewc import EWCTrainer
 from ner.trainer.baseline import BaselineTrainer
 from ner.common.word2vec import get_embed_matrix
 
@@ -29,13 +29,15 @@ config = {
 
     'vocab_size': 23624,
 
-    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_si'),
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_NA_ewc'),
 
-    'si_c': 0.5,
+    'si_c': 0.1,
     'si_epsilon': 0.1,
 
     'word2vec': os.path.join(ROOT_DIR, 'checkpoints', 'GoogleNews-vectors-negative300.bin'),
     #'word2vec': None,
+
+    'multiple_allowed': False,
 }
 
 def main():
@@ -53,22 +55,35 @@ def main():
                 # First train w/ samples w/o 'B-MISC', 'I-MISC' tags
             # Task 2:
                 # Then train w/ samples w 'B-MISC', 'I-MISC' tags only
-            ['B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC'],
-            ['B-PER', 'I-PER', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC'],
-            ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-MISC', 'I-MISC'],
-            ['B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'],
+            ['B-MISC', 'I-MISC'],
+            ['B-MISC', 'I-MISC'],
+        ],
+
+        [   # Experiment 2
+            ['B-LOC', 'I-LOC'],
+            ['B-LOC', 'I-LOC'],     # reversed True
+        ],
+
+        [   # Experiment 3
+            ['B-ORG', 'I-ORG'],
+            ['B-ORG', 'I-ORG'],
+        ],
+
+        [   # Experiment 4
+            ['B-PER', 'I-PER'],
+            ['B-PER', 'I-PER'],
         ],
 
     ]
 
     # ####################
     # Model setup
-    #model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
-    model = SimpleFC(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))
+    model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
     # Load a pretrained embedding matrix
-    train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=[], multiple_allowed=False)
+    train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=[], multiple_allowed=config['multiple_allowed'])
+    print(train_dataset.sentence_counts)
     if config['word2vec'] is not None:
         vocab = train_dataset.vocab
         embed_mat = get_embed_matrix(config['word2vec'], 
@@ -81,15 +96,25 @@ def main():
 
     # Convenience: Do all experiments in one script
     for exp_i, tasks in enumerate(exps):
-        f = open('exp_{}_si.txt'.format(exp_i + 1, exp_i), 'a')
-        f.write("\nTasks: {}\n".format(tasks))
+        # Record
+        if config["multiple_allowed"]:
+            postfix = "MA"
+        else:
+            postfix = "OTO"
+
+        f = open('exp_{}_{}_ewc.txt'.format(postfix, exp_i + 1, exp_i), 'a')
+        f.write("Tasks: {}\n".format(tasks))
 
         # Construct all datasets
         train_loaders = []
         valid_loaders = []
-        for task in tasks:
-            train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=task, multiple_allowed=False)
-            valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task, multiple_allowed=False)
+        for m, task in enumerate(tasks):
+            if m > 0:
+                reversed = True
+            else:
+                reversed = False
+            train_dataset = conll.NA_OTO_CONLL03(train_file, tags_to_remove=task, multiple_allowed=config['multiple_allowed'], reversed=reversed)
+            valid_dataset = conll.NA_OTO_CONLL03(test_file, vocab=train_dataset.vocab, tags_to_remove=task, multiple_allowed=config['multiple_allowed'], reversed=reversed)
             train_loader = conll.get_loader(train_dataset, batch_size=config['batch_size'])
             valid_loader = conll.get_loader(valid_dataset, batch_size=1)
             train_loaders.append(train_loader)
@@ -97,14 +122,12 @@ def main():
 
         # Optimizer reinitialized for every task
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config['lr'])
-        trainer = SITrainer(
+        trainer = EWCTrainer(
                 name=None,
                 config=config,
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
-                si_c=config['si_c'],
-                si_epsilon=config['si_epsilon'],
                 )
 
         log_prev = []
@@ -113,7 +136,7 @@ def main():
             print("#"*30)
             print("Starting task:", task_idx + 1, tasks[task_idx])
             #print("#"*30)
-            name = "exp_{}_task_{}".format(exp_i + 1, task_idx + 1)
+            name = "exp_{}_{}_task_{}".format(postfix, exp_i + 1, task_idx + 1)
             trainer.name = name
 
             # Write
@@ -130,7 +153,7 @@ def main():
             trainer.log = {'f1': 0.0}
 
             # Load last best known model
-            log = trainer.load_checkpoint(os.path.join(config['save_dir'], name+".pth"))
+            log = trainer.load_checkpoint(os.path.join(config['save_dir'], name+".pth"), train_loader)
             log_prev.append(log['f1'])  # Save best performance for the previous task
 
             # Force a test against all valid_loaders

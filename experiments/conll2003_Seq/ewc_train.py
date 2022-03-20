@@ -18,7 +18,7 @@ from ner.data import conll
 from ner.common import Vocabulary, maxlen
 #from ner.model.simple_lstm import SimpleLSTM
 from ner.model.simple_fc import SimpleFC
-from ner.trainer.si import SITrainer
+from ner.trainer.ewc import EWCTrainer
 from ner.trainer.baseline import BaselineTrainer
 from ner.common.word2vec import get_embed_matrix
 
@@ -29,10 +29,7 @@ config = {
 
     'vocab_size': 23624,
 
-    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_si'),
-
-    'si_c': 0.5,
-    'si_epsilon': 0.1,
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_ewc'),
 
     'word2vec': os.path.join(ROOT_DIR, 'checkpoints', 'GoogleNews-vectors-negative300.bin'),
     #'word2vec': None,
@@ -81,7 +78,7 @@ def main():
 
     # Convenience: Do all experiments in one script
     for exp_i, tasks in enumerate(exps):
-        f = open('exp_{}_si.txt'.format(exp_i + 1, exp_i), 'a')
+        f = open('exp_{}_ewc.txt'.format(exp_i + 1, exp_i), 'a')
         f.write("\nTasks: {}\n".format(tasks))
 
         # Construct all datasets
@@ -97,14 +94,12 @@ def main():
 
         # Optimizer reinitialized for every task
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config['lr'])
-        trainer = SITrainer(
+        trainer = EWCTrainer(
                 name=None,
                 config=config,
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
-                si_c=config['si_c'],
-                si_epsilon=config['si_epsilon'],
                 )
 
         log_prev = []
@@ -130,7 +125,7 @@ def main():
             trainer.log = {'f1': 0.0}
 
             # Load last best known model
-            log = trainer.load_checkpoint(os.path.join(config['save_dir'], name+".pth"))
+            log = trainer.load_checkpoint(os.path.join(config['save_dir'], name+".pth"), train_loader)
             log_prev.append(log['f1'])  # Save best performance for the previous task
 
             # Force a test against all valid_loaders

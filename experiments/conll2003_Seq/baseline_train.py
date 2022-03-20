@@ -16,7 +16,8 @@ sys.path.append(ROOT_DIR)  # To find local version of the library
 
 from ner.data import conll
 from ner.common import Vocabulary, maxlen
-from ner.model.simple_lstm import SimpleLSTM
+#from ner.model.simple_lstm import SimpleLSTM
+from ner.model.simple_fc import SimpleFC
 from ner.trainer.baseline import BaselineTrainer
 from ner.common.word2vec import get_embed_matrix
 
@@ -58,7 +59,8 @@ def main():
 
     # ####################
     # Model setup
-    model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
+    #model = SimpleLSTM(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))   # Fixed vocab size
+    model = SimpleFC(vocab_size=config['vocab_size'], num_classes=len(conll.NER_TAGS_CONLL03))
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
     # Load a pretrained embedding matrix
@@ -76,7 +78,7 @@ def main():
     # Convenience: Do all experiments in one script
     for exp_i, tasks in enumerate(exps):
         f = open('exp_{}_normal.txt'.format(exp_i + 1, exp_i), 'a')
-        f.write("Tasks: {}\n".format(tasks))
+        f.write("\nTasks: {}\n".format(tasks))
 
         # Construct all datasets
         train_loaders = []
@@ -148,7 +150,7 @@ def main():
         f.close()
 
 if __name__ == "__main__":
-    for _ in range(1):
+    for _ in range(10):
         if os.path.exists(config['save_dir']):
             shutil.rmtree(config['save_dir'])
         main()

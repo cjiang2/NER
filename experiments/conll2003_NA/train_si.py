@@ -28,7 +28,7 @@ config = {
 
     'vocab_size': 23624,
 
-    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_seq_si'),
+    'save_dir': os.path.join(ROOT_DIR, 'checkpoints', 'NER_conll2003_NA_si'),
 
     'si_c': 0.1,
     'si_epsilon': 0.1,
@@ -36,7 +36,7 @@ config = {
     'word2vec': os.path.join(ROOT_DIR, 'checkpoints', 'GoogleNews-vectors-negative300.bin'),
     #'word2vec': None,
 
-    'multiple_allowed': True,
+    'multiple_allowed': False,
 }
 
 def main():
